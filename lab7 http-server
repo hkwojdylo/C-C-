@@ -1,0 +1,282 @@
+-bash-4.1$ cat http-server.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+
+static void die( const char *s){
+    perror(s);
+    exit(1);
+}
+
+
+int main (int argc, char **argv){
+    int servSock, clntSock, mdbSock;
+    char *host;
+    unsigned short httpPort;
+    unsigned short mdbPort;
+    char buffer[4096];
+    bzero(buffer, sizeof(buffer));
+    unsigned int clntlen;
+
+    struct hostent *server;
+    struct sockaddr_in httpServAddr;
+    struct sockaddr_in httpClntAddr;
+    struct sockaddr_in mdbServ;
+
+    if(argc != 5){
+        fprintf(stderr, "Usage: %s <server_port> <web_root> <mdb-lookup-host> <mdb-lookup-port>\n", argv[0]);
+        exit(1);
+    }
+
+    httpPort = atoi(argv[1]);
+    host = argv[3];
+    mdbPort = atoi(argv[4]);
+
+
+    if((mdbSock = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        die("socket() failed");
+    }
+
+    server = gethostbyname(host);
+    if(server == NULL){
+        die("No such host exists");
+    }
+
+    memset((char *)&mdbServ, 0, sizeof(&mdbServ));
+    mdbServ.sin_family = AF_INET;
+    mdbServ.sin_port = htons(mdbPort);
+    mdbServ.sin_addr.s_addr = inet_addr(inet_ntoa(*(struct in_addr *) server->h_addr));
+
+    if(connect(mdbSock, (struct sockaddr*) &mdbServ, sizeof(mdbServ)) < 0){
+        die("connect() to mdbLookup Server failed");
+    }
+
+    FILE *lookupResults = fdopen(mdbSock, "r");
+
+
+
+    if((servSock =socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        die("socket() failed");
+    }
+
+    memset(&httpServAddr, 0, sizeof(httpServAddr));
+    httpServAddr.sin_family = AF_INET;
+    httpServAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    httpServAddr.sin_port = htons(httpPort);
+
+    if(bind(servSock, (struct sockaddr *) &httpServAddr, sizeof(httpServAddr)) < 0){
+        die("bind() failed");
+    }
+
+    if(listen(servSock, 5) < 0){
+        die("listen() failed");
+    }
+
+
+    while(1){
+
+        clntlen = sizeof(httpClntAddr);
+
+        if((clntSock = accept(servSock, (struct sockaddr *) &httpClntAddr, &clntlen)) < 0){
+            die("accept() failed");
+        }
+
+        fprintf(stderr, "connection started from: %s\n", inet_ntoa(httpClntAddr.sin_addr));
+
+        if((recv(clntSock, buffer, sizeof(buffer), 0)) == 1){
+            die("recv() failed");
+        }
+
+        //quick check
+        if(buffer[0] == '\0'){
+           bzero(buffer, sizeof(buffer));
+           close(clntSock);
+        }else{
+            char *requestLine = strtok(buffer, "\r\n");
+            char *token_separators = "\t \r\n";
+            char *method = strtok(requestLine, token_separators);
+            char *requestURI = strtok(NULL, token_separators);
+            char *httpVersion = strtok(NULL, token_separators);
+
+            if(strcmp(method, "GET") != 0){
+                if(send(clntSock, "HTTP/1.0 501 Not Implemented\r\n\r\n<html><body><h1>501 Not Implemented</h1></body></html>", strlen("HTTP/1.0 501 Not Implemented\r\n\r\n<html><body><h1>501 Not Implemented</h1></body></html>"), 0) != strlen("HTTP/1.0 501 Not Implemented\r\n\r\n<html><body><h1>501 Not Implemented</h1></body></html>")){
+                    die("send() failed");
+                }
+
+                fprintf(stdout, "%s \"%s %s %s\" 501 Not Implemented\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+            }
+
+            else if((strcmp(httpVersion, "HTTP/1.0") != 0) && (strcmp(httpVersion, "HTTP/1.1") != 0)){
+                if(send(clntSock, "HTTP/1.0 501 Not Implemented\r\n\r\n<html><body><h1>501 Not Implemented</h1></body></html>", strlen("HTTP/1.0 501 Not Implemented\r\n\r\n<html><body><h1>501 Not Implemented</h1></body></html>"), 0) != strlen("HTTP/1.0 501 Not Implemented\r\n\r\n<html><body><h1>501 Not Implemented</h1></body></html>")){
+                     die("send() failed");
+                }
+
+                 fprintf(stdout, "%s \"%s %s %s\" 501 Not Implemented\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+            }
+
+            else if(strchr(requestURI, '/') != NULL && strcmp(requestURI, strchr(requestURI, '/')) != 0){
+                if(send(clntSock, "HTTP/1.0 400 Bad Request\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>n", strlen("HTTP/1.0 400 Bad Request\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>n"), 0) != strlen("HTTP/1.0 400 Bad Request\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>n")){
+                   die("send() failed");
+                }
+
+               fprintf(stdout, "%s \"%s %s %s\" 501 Not Implemented\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+            }
+
+            else if((strstr(requestURI, "/..")) != NULL){
+                if(send(clntSock, "HTTP/1.0 400 Bad Request\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>n", strlen("HTTP/1.0 400 Bad Request\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>n"), 0) != strlen("HTTP/1.0 400 Bad Request\r\n\r\n<html><body><h1>400 Bad Request</h1></body></html>n")){
+                    die("send() failed");
+                 }
+
+                fprintf(stdout, "%s \"%s %s %s\" 501 Not Implemented\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+            }
+
+            else{
+                char sendBuff[4096];
+                bzero(sendBuff, sizeof(sendBuff));
+
+                const char *form =
+                        "<h1>mdb-lookup</h1>\n"
+                        "<p>\n"
+                        "<form method=GET action=/mdb-lookup>\n"
+                        "lookup: <input type=text name=key>\n"
+                        "<input type=submit>\n"
+                        "</form>\n"
+                        "<p>\n";
+
+                if(strcmp(requestURI, "/mdb-lookup") == 0){
+                    if(send(clntSock, "HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n"), 0) != strlen("HTTP/1.0 200 OK\r\n\r\n")){
+                        die("send() failed 1");
+                    }
+
+                    fprintf(stdout, "%s \"%s %s %s\" 200 OK\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+
+                    if(send(clntSock, form, strlen(form), 0) != strlen(form)){
+                        die("send() failed 2");
+                    }
+                }
+
+                else if(strstr(requestURI, "/mdb-lookup?key=") != NULL && strcmp(requestURI, strstr(requestURI, "/mdb-lookup?key=")) == 0){
+                    char *tableBorder = "<p><table border>\r\n";
+                    char *table = "</table>\r\n";
+
+                    if(send(clntSock, "HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n"), 0) != strlen("HTTP/1.0 200 OK\r\n\r\n")){
+                        die("send() failed 3");
+                    }
+
+                    fprintf(stdout, "%s \"%s %s %s\" 200 OK\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+
+                    if(send(clntSock, form, strlen(form), 0) != strlen(form)){
+                        die("send() failed 4");
+                    }
+
+                    if(send(clntSock, tableBorder, strlen(tableBorder), 0) != strlen(tableBorder)){
+                        die("send() failed 5");
+                    }
+
+                    strtok(requestURI, "=");
+                    char *lookupKey = strtok(NULL, "=");
+
+                    if(lookupKey == NULL){
+                        if(send(mdbSock, "\n", strlen("\n"), 0) != strlen("\n")){
+                        die("send() failed");
+                    }
+                    }else{
+                        char lookupstr[strlen(lookupKey)+1];
+                        strcpy(lookupstr, lookupKey);
+                        strcat(lookupstr, "\n");
+
+                        if(send(mdbSock, lookupstr, strlen(lookupstr), 0) != strlen(lookupstr)){
+                            die("send() failed");
+                        }
+                    }
+
+                    bzero(buffer, sizeof(buffer));
+
+                    if(lookupResults == NULL){
+                        die("fdopen() failed");
+                    }
+
+                while(fgets(buffer, sizeof(buffer), lookupResults)){
+                    if(strchr(buffer, '\n') != NULL && strcmp(buffer, (strchr(buffer, '\n'))) == 0){
+                        break;
+                    }
+
+                    int rowLen = 9 + strlen(buffer);
+                    char row[rowLen];
+                    char *htmlTableRow = "<tr><td> ";
+                    strcpy(row, htmlTableRow);
+                    strcat(row, buffer);
+
+                    if(send(clntSock, row, strlen(row), 0) != strlen(row)){
+                        die("send() failed");
+                    }
+                }
+
+                if(send(clntSock, table, strlen(table), 0) != strlen(table)){
+                    die("send() failed");
+                }
+
+                bzero(buffer, sizeof(buffer));
+            }
+
+            else{
+
+                char file[sizeof(argv[2]) + sizeof(requestURI) + 10];
+                strcpy(file, argv[2]);
+                strcat(file, requestURI);
+
+                if(requestURI[((int) strlen(requestURI))-1] == '/'){
+                        char *append = "index.html";
+                        strcat(file, append);
+                }
+
+                FILE *fp = fopen(file, "r");
+
+                if(fp == NULL){
+                    if(send(clntSock, "HTTP/1.0 404 Not Found\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>", strlen("HTTP/1.0 404 Not Found\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>"), 0) != strlen("HTTP/1.0 404 Not Found\r\n\r\n<html><body><h1>404 Not Found</h1></body></html>")){
+                            die("send() failed");
+                    }
+
+                    fprintf(stdout, "%s \"%s %s %s\" 404 Not Found\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+                    int size = sizeof(requestURI);
+                    bzero(requestURI, size);
+                }else{
+                    if(send(clntSock, "HTTP/1.0 200 OK\r\n\r\n", strlen("HTTP/1.0 200 OK\r\n\r\n"), 0) != strlen("HTTP/1.0 200 OK\r\n\r\n")){
+                        die("send() failed");
+                    }
+
+                    fprintf(stdout, "%s \"%s %s %s\" 200 OK\n", inet_ntoa(httpClntAddr.sin_addr), method, requestURI, httpVersion);
+
+                    size_t n;
+                    while((n = fread(sendBuff, 1, sizeof(sendBuff), fp)) > 0){
+                        if(send(clntSock, sendBuff, sizeof(sendBuff), 0) != sizeof(sendBuff)){
+                            die("send() failed");
+                        }
+                        bzero(sendBuff, sizeof(sendBuff));
+                    }
+
+                    bzero(sendBuff, sizeof(sendBuff));
+                    fclose(fp);
+                }
+             }
+            }
+        }
+
+        close(clntSock);
+    }
+
+
+    return 0;
+
+
+
+}
