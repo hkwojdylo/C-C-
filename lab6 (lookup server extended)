@@ -1,0 +1,136 @@
+-bash-4.1$ cat mdb-lookup-server.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include "mylist.h"
+#include "mdb.h"
+
+static void die( const char *s){
+    perror(s);
+    exit(1);
+}
+
+int main (int argc, char **argv){
+
+    // ignore SIGPIPE so that we don’t terminate when we call
+    // send() on a disconnected socket.
+    if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
+        die("signal() failed");
+
+    if(argc !=3){
+        fprintf(stderr, "usage: %s <filebase> <server-port>\n", argv[0]);
+        exit(1);
+    }
+
+    char *filebaseFile = argv[1];
+    unsigned short lookupPort = atoi(argv[2]);
+
+    int servSock;
+    if((servSock = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        die("socket failed");
+    }
+
+    struct sockaddr_in lookupServAddr;
+    memset(&lookupServAddr, 0, sizeof(lookupServAddr));
+    lookupServAddr.sin_family = AF_INET;
+    lookupServAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    lookupServAddr.sin_port = htons(lookupPort);
+
+    if(bind(servSock, (struct sockaddr *) &lookupServAddr, sizeof(lookupServAddr)) < 0){
+        die("bind failed");
+    }
+
+    if(listen(servSock, 5) < 0){
+        die("listen failed");
+    }
+
+    int clntSock;
+    socklen_t clntLen;
+    struct sockaddr_in lookupClntAddr;
+
+    FILE *fp;
+    FILE *in;
+
+    while(1){
+
+        clntLen = sizeof(lookupClntAddr);
+
+        if((clntSock=accept(servSock, (struct sockaddr *) &lookupClntAddr, &clntLen)) < 0){
+            die("accept failed");
+        }
+
+        fprintf(stderr, "connection started from: %s\n", inet_ntoa(lookupClntAddr.sin_addr));
+        if((fp = fopen(filebaseFile, "rb")) == NULL){
+            die(filebaseFile);
+        }
+
+        struct List fileList;
+        initList(&fileList);
+
+        int loaded = loadmdb(fp, &fileList);
+        if(loaded < 0){
+            die("loading file failed");
+        }
+
+        fclose(fp);
+
+        if((in = fdopen(clntSock, "r")) == NULL){
+            die("fdopen failed");
+        }
+
+        char lookFor[1000];
+        char key[6];
+
+        while(fgets(lookFor, sizeof(lookFor), in ) != NULL){
+            strncpy(key, lookFor, sizeof(key)-1);
+            key[sizeof(key)-1] = '\0';
+
+            size_t lchar = strlen(key)-1;
+            if(key[lchar] == '\n'){
+                key[lchar] = '\0';
+            }
+
+            struct Node *node = fileList.head;
+            int recNo = 1;
+            while (node) {
+                struct MdbRec *rec = (struct MdbRec *)node->data;
+                if (strstr(rec->name, key) || strstr(rec->msg, key)) {
+                    char out[75];
+                    int len;
+                    if((len = sprintf(out, "%4d: {%s} said {%s}\n", recNo, rec->name, rec->msg)) < 0){
+                        die("lookup failed");
+                    }
+
+                    if(send(clntSock, out, len, 0) < 0){
+                        die("send failed");
+                    }
+                }
+
+                node = node->next;
+                recNo++;
+            }
+
+            char blank[1] = "\n";
+            if(send(clntSock, blank, 1, 0)<0){
+                die("send failed");
+            }
+
+            bzero(lookFor, sizeof(lookFor));
+            bzero(key, sizeof(key));
+        }
+
+        fprintf(stderr, "connection terminated from: %s\n", inet_ntoa(lookupClntAddr.sin_addr));
+        freemdb(&fileList);
+        removeAllNodes(&fileList);
+        fclose(in);
+    }
+
+    return 0;
+}
