@@ -1,0 +1,111 @@
+-bash-4.1$ cat tlist.h
+#ifndef __TLIST_H__
+#define __TLIST_H__
+
+using namespace std;
+
+#include <deque>
+#include <algorithm>
+#include <iostream>
+
+template <typename T>
+class TList;
+template <typename T>
+ostream& operator<<(ostream& os, const TList<T>& rhs);
+
+template <typename T>
+class TList{
+
+    public:
+
+        int isEmpty() const{
+            return dQ.empty();
+        }
+
+        int size() const{
+            return dQ.size();
+        }
+
+        void addFront(const T& t){
+            dQ.push_front(t);
+        }
+
+        T popFront();
+
+        void reverse();
+
+        TList& operator+=(const TList& x);
+
+        TList operator+(const TList& x);
+
+        T& operator[](int i);
+
+        const T& operator[](int i) const;
+
+        friend ostream& operator<< <T>(ostream& os, const TList<T>& x);
+
+    private:
+
+        deque<T> dQ;
+};
+
+template <typename T>
+T TList<T>::popFront(){
+
+    T temp = dQ.front();
+    dQ.pop_front();
+    return temp;
+}
+
+template <typename T>
+void TList<T>::reverse(){
+
+    ::reverse(dQ.begin(), dQ.end());
+}
+
+template <typename T>
+TList<T>& TList<T>::operator+=(const TList<T>& x){
+
+    typename deque<T>::const_iterator itr;
+
+    for(itr = x.dQ.begin(); itr != x.dQ.end(); ++itr){
+        dQ.push_back(*itr);
+    }
+
+    return *this;
+}
+
+template <typename T>
+TList<T> TList<T>::operator+(const TList<T>& x){
+
+    TList<T> y(*this);
+    y += x;
+    return y;
+}
+
+template <typename T>
+T& TList<T>::operator[](int i){
+
+    return dQ[i];
+}
+
+template <typename T>
+const T& TList<T>::operator[](int i) const{
+
+    return ((TList&)*this)[i];
+}
+
+template <typename T>
+ostream& operator<<(ostream& os, const TList<T>& x){
+
+    os << "{ ";
+    for( auto i = x.dQ.begin(); i!= x.dQ.end(); ++i){
+        os << *i << " ";
+    }
+
+    os << "}";
+    return os;
+}
+
+#endif
+
