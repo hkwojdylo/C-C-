@@ -1,0 +1,36 @@
+-bash-4.1$ cat revecho.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "mylist.h"
+
+static void printString(void *p){
+    printf("%s\n", (char *)p);
+}
+
+
+int main (int argc, char **argv){
+
+    struct List words;
+    initList(&words);
+
+    for(int i = 1; i < argc; i++){
+        addFront(&words, argv[i]);
+    }
+
+    traverseList(&words, &printString);
+    printf("\n");
+
+    struct Node *found = (*findNode)(&words, "dude", (int (*)(const void *, const void *))(strcmp));
+
+    if(found == 0){
+        printf("dude not found\n");
+    }else{
+        printf("dude found\n");
+    }
+
+    removeAllNodes(&words);
+
+    return 0;
+
+}
