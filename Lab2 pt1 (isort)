@@ -1,0 +1,98 @@
+-bash-4.1$ cat isort.h
+#ifndef __ISORT_H__
+#define __ISORT_H__
+int cmp_asc(const void *x, const void *y);
+int cmp_des(const void *x, const void *y);
+void sort_integer_array(int *begin, int *end, int ascending);
+
+#endif
+-bash-4.1$ cat isort.c
+#include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
+#include "isort.h"
+
+
+int main(int argc, char **argv){
+    srandom(time(NULL));
+
+    int s;
+    printf("Enter size of array\n");
+    scanf(" %d", &s);
+
+    int *values =  malloc(s * sizeof(int));
+    if (values == NULL) {
+         perror("malloc returned NULL");
+         exit(1);
+    }
+
+    for(int i = 0; i < s; i++){
+        values[i] = random()%100;
+    }
+
+    printf("\n%s", "original: ");
+    for(int i = 0; i<s; i++){
+        printf("%d ", values[i]);
+    }
+
+
+    int *asc = malloc(s * sizeof(int));
+    if(asc == NULL){
+        perror("malloc returned NULL");
+        exit(1);
+    }
+
+    for(int i = 0; i<s; i++){
+        asc[i] = values[i];
+    }
+
+    sort_integer_array(asc, asc + s, 1);
+
+    printf("\n%s", "ascending: ");
+    for(int i = 0; i<s; i++){
+        printf("%d ", asc[i]);
+    }
+
+
+    int *des =  malloc(s * sizeof(int));
+    if(des == NULL){
+        perror("malloc returned NULL");
+        exit(1);
+    }
+
+
+    for(int i = 0; i<s; i++){
+        des[i] = values[i];
+    }
+
+    sort_integer_array(des, des + s, 0);
+
+    printf("\n%s", "descending: ");
+    for(int i = 0; i<s; i++){
+        printf("%d ", des[i]);
+    }
+
+    printf("\n");
+    free(values);
+    free(asc);
+    free(des);
+}
+
+void sort_integer_array(int *begin, int *end, int ascending){
+    int size = end - begin;
+    if(ascending == 1){
+        qsort(begin, size, sizeof(int), cmp_asc);
+    }else if (ascending == 0){
+        qsort(begin, size, sizeof(int), cmp_des);
+    }
+
+}
+
+int cmp_asc(const void *x, const void *y){
+    return( *(int*)x - *(int*)y);
+}
+
+int cmp_des(const void *x, const void *y){
+    return(*(int*)y - *(int*)x);
+}
+
