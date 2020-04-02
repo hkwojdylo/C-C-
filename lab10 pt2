@@ -1,0 +1,133 @@
+-bash-4.1$ cat strlist.h
+#ifndef __STRLIST_H__
+#define __STRLIST_H__
+
+#include <string>
+#include "tlist.h"
+using namespace std;
+
+typedef string MyString;
+
+typedef TList<string> StrList;
+
+#endif
+-bash-4.1$ cat tlist.h
+#ifndef __TLIST_H__
+#define __TLIST_H__
+
+using namespace std;
+
+#include <list>
+#include <iostream>
+
+template <typename T>
+class TList;
+
+template <typename T>
+ostream& operator<<(ostream& os, const TList<T>& l);
+
+template <typename T>
+class TList{
+
+    public:
+
+        int isEmpty() const {
+
+            return theList.empty(); }
+
+
+        int size() const {
+
+            return theList.size();
+        }
+
+        void addFront(const T& t){
+
+            return theList.push_front(t);
+        }
+
+        T popFront();
+
+        void reverse(){
+
+            theList.reverse();
+        }
+
+        TList& operator+=( const TList& x);
+
+        TList operator+(const TList& x);
+
+        T& operator[](int i);
+
+        const T& operator[](int i) const;
+
+        friend ostream& operator<< <T>(ostream& os, const TList<T>& x);
+
+    private:
+
+        list<T> theList;
+
+};
+
+template <typename T>
+T TList<T>::popFront(){
+
+    T temp = theList.front();
+    theList.pop_front();
+    return temp;
+}
+
+
+template <typename T>
+TList<T>& TList<T>::operator+=(const TList<T>& x){
+
+    typename list<T>::const_iterator itr;
+    for(itr = x.theList.begin(); itr != x.theList.end(); ++itr){
+        theList.push_back(*itr);
+    }
+
+    return *this;
+}
+
+template <typename T>
+TList<T> TList<T>::operator+(const TList<T>& x){
+
+    TList<T> y(*this);
+    y += x;
+    return y;
+}
+
+template <typename T>
+T& TList<T>::operator[](int i){
+
+    typename list<T>::iterator itr;
+    int index = 0;
+
+    for(itr=theList.begin(); index<i; ++itr){
+        index++;
+    }
+
+    return *itr;
+}
+
+template <typename T>
+const T& TList<T>::operator[](int i) const{
+    return ((TList&)*this)[i];
+}
+
+template <typename T>
+ostream& operator<<(ostream& os, const TList<T>& x){
+
+    os<< "{ ";
+    typename list<T>::const_iterator itr;
+
+    for(itr = x.theList.begin(); itr != x.theList.end(); ++itr){
+        os << *itr << " ";
+    }
+
+    os << "}";
+    return os;
+}
+
+#endif
+
