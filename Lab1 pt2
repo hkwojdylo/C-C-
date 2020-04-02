@@ -1,0 +1,56 @@
+-bash-4.1$ cat convert.c
+#include <stdio.h>
+#include "convert.h"
+
+int main(){
+    int x;
+    scanf("%d", &x);
+
+    printf("signed dec:   %d\n", x);
+    printf("unsigned dec: %u\n", x);
+    printf("hex:          %x\n", x);
+    printf("binary:      ");
+    convert(x);
+    printf("\n");
+    return 0;
+
+}
+
+int convert(int x){
+    int i;
+    for( i = 0; i<32; i++){
+        if(i%4 == 0){
+            printf(" ");
+        }
+
+        int b = (x&(1<<(31-i)));
+
+        if(b == 0){
+            printf("0");
+        }else{
+            printf("1");
+        }
+    }
+
+    return 0;
+
+}
+-bash-4.1$ cat convert.h
+#ifndef __CONVERT_H__
+#define __CONVERT_H__
+int convert (int x);
+#endif
+
+-bash-4.1$ cat printf-test.c
+#include <stdio.h>
+// submitting and commiting practice
+int main()
+{
+    int x = -1;
+
+    printf("printf-ing -1 as %%d: %d\n", x);
+    printf("printf-ing -1 as %%u: %u\n", x);
+    printf("printf-ing -1 as %%x: %x\n", x);
+
+    return 0;
+}
