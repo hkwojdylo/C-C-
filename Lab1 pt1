@@ -1,0 +1,95 @@
+#include <stdio.h>
+#include "gcd.h"
+// Euclid formula pseudocode on https://en.wikipedia.org/wiki/Euclidean_algorithm
+int gcd (int x, int y){
+    int tmp;
+    while ( y != 0){
+        tmp = y;
+        y = x%y;
+        x = tmp;
+    }
+    return x;
+}
+
+
+-bash-4.1$
+-bash-4.1$ cat gcd.g
+cat: gcd.g: No such file or directory
+-bash-4.1$ cat gcd.h
+#ifndef __GCD_H__
+#define __GCD_H__
+int gcd (int x, int y);
+#endif
+-bash-4.1$ cat main.c
+#include <stdio.h>
+#include "prime.h"
+#include "gcd.h"
+
+int main(){
+    int x;
+    int y;
+
+    printf("Please enter two numbers\n");
+    scanf("%d", &x);
+    scanf("%d", &y);
+
+    double avg = (x+y)/2.0;
+    printf("Here is the average: %f\n", avg);
+
+    printf("Is %d prime: ", x);
+    if (prime(x) == 0){
+        printf("NO\n");
+    }else {
+        printf("YES\n");
+    }
+
+    printf("Is %d prime: ", y);
+    if (prime(y) == 0){
+        printf("NO\n");
+    }else {
+        printf("YES\n");
+    }
+
+    printf("Are %d and %d relatively prime: ", x, y);
+    if(gcd(x, y) != 1){
+        printf("NO\n");
+    }else{
+        printf("YES\n");
+    }
+
+
+    return 0;
+}
+-bash-4.1$ cat prime.c
+#include <stdio.h>
+#include <math.h>
+#include "prime.h"
+#include "gcd.h"
+
+int prime (int x){
+    int answer = 1;
+    if (x == 2){
+        return answer;
+    }
+
+    if(x%2 == 0){
+        answer = 0;
+    }
+
+    int i;
+    int bound = (int)(floor(sqrt(x)));
+    for (i = 3; i < bound; i += 2){
+       if( x%i == 0){
+            return  0;
+        }
+    }
+    return answer;
+}
+
+
+-bash-4.1$ cat prime.h
+#ifndef __PRIME_H__
+#define __PRIME_H__
+int prime (int x);
+#endif
+
